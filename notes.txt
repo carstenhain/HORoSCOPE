@@ -2,3 +2,11 @@ HG00105_DBG;/scratch/hain/centromere/tool_data/HG00105.unitigs.fa.gz;dbg
 HG00105_CRAM;/scratch/hain/centromere/tool_data/HG00105.final.cram;cram
 HG00096_DBG;/scratch/hain/centromere/tool_data/HG00096.unitigs.fa.gz;dbg
 HG00096_CRAM;/scratch/hain/centromere/tool_data/HG00096.final.cram;cram
+HG00271_DBG;/scratch/hain/centromere/tool_data/HG00271.unitigs.fa.gz;dbg
+HG00271_CRAM;/scratch/hain/centromere/tool_data/HG00271.final.cram;cram
+HG00244_DBG;/scratch/hain/centromere/tool_data/HG00244.unitigs.fa.gz;dbg
+HG00244_CRAM;/scratch/hain/centromere/tool_data/HG00244.final.cram;cram
+HG00404_DBG;/scratch/hain/centromere/tool_data/HG00404.unitigs.fa.gz;dbg
+HG00404_CRAM;/scratch/hain/centromere/tool_data/HG00404.final.cram;cram
+HG00437_DBG;/scratch/hain/centromere/tool_data/HG00437.unitigs.fa.gz;dbg
+HG00437_CRAM;/scratch/hain/centromere/tool_data/HG00437.final.cram;cram

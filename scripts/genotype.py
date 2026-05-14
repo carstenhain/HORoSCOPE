@@ -57,7 +57,7 @@ def main():
             
             ### subset kmers to this cluster
             c_subset = kmer_df.loc[
-                    kmer_df[kmer_df["CLUSTER"] == c]["KMER"].tolist()
+                    kmer_annot_df[kmer_annot_df["CLUSTER"] == c]["KMER"].tolist()
                 ]
             
             ### get number of kmers and number of positive kmers

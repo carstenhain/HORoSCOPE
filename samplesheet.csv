@@ -1,7 +1,7 @@
 NAME;FILE_PATH;TYPE
-HG00418_DBG;/scratch/hain/centromere/tool_data/HG00418.unitigs.fa.gz;dbg
-HG00418_CRAM;/scratch/hain/centromere/tool_data/HG00418.final.cram;cram
-HG00105_DBG;/scratch/hain/centromere/tool_data/HG00105.unitigs.fa.gz;dbg
-HG00105_CRAM;/scratch/hain/centromere/tool_data/HG00105.final.cram;cram
-HG00096_DBG;/scratch/hain/centromere/tool_data/HG00096.unitigs.fa.gz;dbg
-HG00096_CRAM;/scratch/hain/centromere/tool_data/HG00096.final.cram;cram
+HG01183_DBG;/scratch/hain/centromere/tool_data/HG01183.unitigs.fa.gz;dbg
+HG01183_CRAM;/scratch/hain/centromere/tool_data/HG01183.final.cram;cram
+HG01251_DBG;/scratch/hain/centromere/tool_data/HG01251.unitigs.fa.gz;dbg
+HG01251_CRAM;/scratch/hain/centromere/tool_data/HG01251.final.cram;cram
+HG01345_DBG;/scratch/hain/centromere/tool_data/HG01345.unitigs.fa.gz;dbg
+HG01345_CRAM;/scratch/hain/centromere/tool_data/HG01345.final.cram;cram
