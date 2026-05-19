@@ -1,1 +1,5 @@
 genotype_centromere_train_test.nf
+genotype_centromere.nf
+data/check_data.ipynb
+notes.txt
+unused_nextflow.war_mal_config
