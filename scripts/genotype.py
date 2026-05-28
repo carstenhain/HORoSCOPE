@@ -3,28 +3,108 @@ import re
 import pandas as pd # type: ignore
 import pickle
 import numpy as np # type: ignore
+from tqdm import tqdm # type: ignore
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sample_kmer_table', required=True)
-    parser.add_argument('--kmer_annot_tsv', required=True)
-    parser.add_argument('--model_directory', required=True)
+    parser.add_argument('--kmer_table', required=True, help="Table with kmer counts for each sample, output of reformat_merge_kmers.py")
+    parser.add_argument('--samplesheet', required=True, help="Samplesheet with sample names, paths and normalization strategy, same as for the complete workflow")
+    parser.add_argument('--model_directory', required=True, help="Directory containing the trained models for length inference")
     args = parser.parse_args()
 
+    ### process only selected chromosomes
     chromosomes = ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr16", "chr17", "chr18", "chr19", "chr20"]
 
     ### prepare list to store results
     results = []
 
     ### load kmer counts and kmer annotations
-    kmer_df = pd.read_csv(args.sample_kmer_table, sep="\t").set_index("KMER")
-    kmer_annot_df = pd.read_csv(args.kmer_annot_tsv, sep="\t")
-
-    ### calculate normalization
-    # for now use the mean of all normalization kmers
-    norm_kmers = kmer_annot_df[kmer_annot_df["CLUSTER"].str.contains("NORM")]["KMER"].tolist()
-    normalization = kmer_df.loc[norm_kmers].mean()
+    kmer_df = pd.read_csv(args.kmer_table, sep="\t").set_index("KMER")
     
+    ### load samplesheet
+    samplesheet = pd.read_csv(args.samplesheet, sep=";")
+    
+    ### calculate normalization
+    sample_names = samplesheet["NAME"].tolist()
+    norm_dfs = []
+    
+    ### factor for different normalization values between raw and dbg samples, empirically determined
+    raw_to_dbg_factor = 1.0475077160727808
+    
+    ### calculate global normalization value
+    global_norm_df = kmer_df[kmer_df["CLUSTER"].str.contains("_NORM_")][sample_names].agg(["mean", "std"]).T
+    global_norm_df["NORM_STRATEGY"] = "GLOBAL"
+    norm_dfs.append(global_norm_df.copy())
+    
+    ### calculate chromosome-specific normalization values
+    for chrom in chromosomes:
+        ### all normalization kmers of this chromosome
+        chrom_norm_df = kmer_df[kmer_df["CLUSTER"].str.contains(f"{chrom}_NORM_")][sample_names].agg(["mean", "std"]).T
+        chrom_norm_df["NORM_STRATEGY"] = chrom
+        norm_dfs.append(chrom_norm_df.copy())
+        
+        ### only p or q normalization kmers of this chromosome
+        for arm in ["P", "Q"]:           
+            chrom_norm_df = kmer_df[kmer_df["CLUSTER"] == f"{chrom}_NORM_{arm}"][sample_names].agg(["mean", "std"]).T
+            chrom_norm_df["NORM_STRATEGY"] = f"{chrom}_{arm}"
+            norm_dfs.append(chrom_norm_df.copy())
+    
+    ### merge normalization values into a single dataframe
+    norm_df = pd.concat(norm_dfs)
+    
+    ### adjust normalization values for raw samples
+    col_normed_mean = []
+    for idx, row in norm_df.iterrows():
+        if samplesheet[samplesheet["NAME"] == idx]["FILE_TYPE"].values[0] in ["fastq", "fasta", "fastq.gz", "fasta.gz", "fastq.bgz", "fasta.bgz", "bam", "cram"]:
+            col_normed_mean.append(raw_to_dbg_factor * row["mean"])
+        else:
+            col_normed_mean.append(row["mean"])
+    norm_df["mean"] = col_normed_mean
+    
+    ### apply different normalization strategies to kmer counts
+    # do so for each chromosomes separatly, concat afterwards
+    normed_kmer_dfs = []
+    for chrom in tqdm(chromosomes, total=len(chromosomes), desc="Normalizing k-mer counts by chromosome"):
+        
+        ### copy kmers of this chromosome
+        chrom_kmers = kmer_df[kmer_df["CLUSTER"].str.startswith(f"{chrom}_")].copy()
+        
+        ### build normalization vector
+        normalization_vector = []
+        for sample_column in chrom_kmers.columns:
+            if sample_column == "CLUSTER":
+                continue
+            
+            norm_strategy = samplesheet[samplesheet["NAME"] == sample_column]["NORMALIZATION"].values[0]
+            if norm_strategy == "global":
+                normalization_value = norm_df[norm_df["NORM_STRATEGY"] == "GLOBAL"].at[sample_column, "mean"]
+            elif norm_strategy == "chromosome":
+                normalization_value = norm_df[norm_df["NORM_STRATEGY"] == chrom].at[sample_column, "mean"]
+            elif norm_strategy == "p_arm":
+                normalization_value = norm_df[norm_df["NORM_STRATEGY"] == f"{chrom}_P"].at[sample_column, "mean"]
+            elif norm_strategy == "q_arm":
+                normalization_value = norm_df[norm_df["NORM_STRATEGY"] == f"{chrom}_Q"].at[sample_column, "mean"]
+            else:
+                ### test for external normalization strategy
+                try:
+                    normalization_value = float(norm_strategy)
+                except ValueError:
+                    raise ValueError(f"Unknown or erroneous normalization strategy '{norm_strategy}' for sample '{sample_column}', must be one of 'global', 'chromosome', 'p_arm', 'q_arm' or a numeric value.")
+            
+            normalization_vector.append({"SAMPLE": sample_column, "VALUE": normalization_value})
+        
+        ### convert normalization vector into dataframe and apply to kmer counts
+        chrom_norm_df = pd.DataFrame(normalization_vector).set_index("SAMPLE")
+        chrom_kmers[chrom_norm_df.index] = chrom_kmers[chrom_norm_df.index].div(chrom_norm_df["VALUE"], axis=1)
+        
+        ### append normed kmers of this chromosome to list
+        normed_kmer_dfs.append(chrom_kmers)
+    
+    ### concat normed kmer dataframes of all chromosomes
+    normed_kmer_df = pd.concat(normed_kmer_dfs)
+    normed_kmer_df.to_csv("debug_normed_kmers.tsv", sep="\t", index=True)
+
+    """
     ### normalize kmer counts
     normed_kmer_df = kmer_df / normalization
 
@@ -153,6 +233,6 @@ def main():
 
     ### write to file
     pd.DataFrame(formatted_results).to_csv("centromere_genotyping.tsv", sep="\t", index=False)
-
+    """
 if __name__ == '__main__':
     main()

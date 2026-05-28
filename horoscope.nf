@@ -5,6 +5,7 @@ nextflow.enable.dsl=2
 params.samplesheet = "samplesheet.csv"
 params.outdir = null
 params.kmer_fasta = "${projectDir}/data/all_tagging_kmers.fasta.gz"
+params.help = false
 
 // Help message
 def helpMessage() {
@@ -25,6 +26,7 @@ def helpMessage() {
       - FILE_TYPE:            Type of the input file (string, e.g. 'bam', 'cram', 'fastq', 'dbg')
       - CRAM_REFERENCE_PATH:  Path to reference FASTA for CRAM decoding (or NA)
       - MAKE_DBG:             Whether to build a de Bruijn graph for this sample (true/false)
+      - NORMALIZATION:        Normalization mode ('global', 'chrom', or a float value)
     """.stripIndent()
 }
 
@@ -34,7 +36,6 @@ def helpMessage() {
 
 process MAKE_DBG {
     tag "${name}"
-    publishDir "${params.outdir}", mode: 'copy'
 
     input:
     tuple val(name), path(input_file), val(file_type), val(cram_ref)
@@ -63,10 +64,11 @@ process UNPACK_KMER_FASTA {
 
 process GATHER_KMERS_DBG {
     tag "${name}"
-    publishDir "${params.outdir}", mode: 'copy'
 
     input:
     tuple val(name), path(input_file)
+    path(kmer_fasta)
+    path(dbg_script)
 
     output:
     tuple val(name), path("${name}.kmer.tsv")
@@ -74,7 +76,7 @@ process GATHER_KMERS_DBG {
     script:
     """
     ### rewrite fasta to a list of kmers
-    zcat ${projectDir}/data/all_tagging_kmers.fasta.gz | awk 'NR % 2 == 0' > kmer_list.txt
+    cat "${kmer_fasta}" | awk 'NR % 2 == 0' > kmer_list.txt
 
     ### create local uncompressed copy of the dbg file in task work directory
     gzip -dc "${input_file}" > dbg.uncompressed.fa
@@ -84,7 +86,7 @@ process GATHER_KMERS_DBG {
     
 
     ### call python file to convert the zgrep output into a kmer table
-    python3 ${projectDir}/scripts/dbg_to_kmer_table.py \\
+    python3 ${dbg_script} \\
         --name "${name}" \\
         --zgrep_file "${name}.kmers.zgrep.txt"  \\
         --kmer_list kmer_list.txt \\
@@ -97,7 +99,6 @@ process GATHER_KMERS_DBG {
 
 process GATHER_KMERS_JF {
     tag "${name}"
-    publishDir "${params.outdir}", mode: 'copy'
 
     input:
     tuple val(name), path(input_file), val(file_type), val(cram_ref), path(kmer_fasta)
@@ -109,18 +110,18 @@ process GATHER_KMERS_JF {
     """
     if [[ "${file_type}" == "fastq" || "${file_type}" == "fasta" ]]; then
         if [[ "${input_file}" == *.gz || "${input_file}" == *.bgz ]]; then
-            gzip -dc "${input_file}" | jellyfish count -m 61 -s 2G --if ${kmer_fasta} -t ${task.cpus} -C /dev/stdin -o "${name}.jf"
+            jellyfish count -m 61 -s 2G -t ${task.cpus} --if "${kmer_fasta}" -C <(zcat "${input_file}") -o "${name}.jf"
         else
-            cat "${input_file}" | jellyfish count -m 61 -s 2G --if ${kmer_fasta} -t ${task.cpus} -C /dev/stdin -o "${name}.jf"
+            jellyfish count -m 61 -s 2G -t ${task.cpus} --if "${kmer_fasta}" -C <(cat "${input_file}") -o "${name}.jf"
         fi
     elif [[ "${file_type}" == "bam" ]]; then
-        samtools fasta "${input_file}" | jellyfish count -m 61 -s 2G --if ${kmer_fasta} -t ${task.cpus} -C /dev/stdin -o "${name}.jf"
+        jellyfish count -m 61 -s 2G -t ${task.cpus} --if "${kmer_fasta}" -C <(samtools fasta "${input_file}") -o "${name}.jf"
     elif [[ "${file_type}" == "cram" ]]; then
         if [[ "${cram_ref}" == "NA" || -z "${cram_ref}" ]]; then
             echo "CRAM input requires CRAM_REFERENCE_PATH for sample ${name}" >&2
             exit 1
         fi
-        samtools fasta -T "${cram_ref}" "${input_file}" | jellyfish count -m 61 -s 2G --if ${kmer_fasta} -t ${task.cpus} -C /dev/stdin -o "${name}.jf"
+        jellyfish count -m 61 -s 2G -t ${task.cpus} --if "${kmer_fasta}" -C <(samtools fasta --reference "${cram_ref}" "${input_file}") -o "${name}.jf"
     else
         echo "Unsupported FILE_TYPE for GATHER_KMERS_JF: ${file_type}" >&2
         exit 1
@@ -130,21 +131,45 @@ process GATHER_KMERS_JF {
         "${name}.jf" \\
         -s "${kmer_fasta}" \\
         -o "${name}.kmer.tsv"
+
+    rm "${name}.jf"
     """
 }
 
-process COLLECT_KMER_OUTPUTS {
+process FORMAT_AND_MERGE_KMERS {
     publishDir "${params.outdir}", mode: 'copy'
 
     input:
     path(kmer_files)
+    path(reformat_script)
+    path(kmer_info_file)
 
     output:
-    path("all_kmer_files.txt")
+    path("final_kmer_merged.tsv")
 
     script:
     """
     ls -1 ${kmer_files} > all_kmer_files.txt
+    python3 ${reformat_script} \\
+        --kmer_file_list all_kmer_files.txt \\
+        --kmer_info_file ${kmer_info_file}
+    """
+}
+
+process GENOTYPE {
+    publishDir "${params.outdir}", mode: 'copy'
+
+    input:
+    path(merged_kmers)
+    path(samplesheet)
+    path(genotype_script)
+
+    output:
+    path("centromere_genotyping.tsv")
+
+    script:
+    """
+    echo "python3 ${genotype_script} --kmer_file_path ${merged_kmers} --samplesheet ${samplesheet}"
     """
 }
 
@@ -164,16 +189,24 @@ workflow {
         .fromPath(params.samplesheet)
         .splitCsv(header: true, sep: ';')
         .map { row ->
+            def normalizationRaw = (row.NORMALOIZATION ?: row.NORMALIZATION ?: '').toString().trim()
+            def normalizationLower = normalizationRaw.toLowerCase()
+            def isFloatNormalization = normalizationRaw.isNumber()
+            if (!(normalizationLower in ['global', 'chrom']) && !isFloatNormalization) {
+                error "Invalid NORMALIZATION value '${normalizationRaw}' for sample ${row.NAME}. Allowed values are 'global', 'chrom', or a float."
+            }
+
             tuple(
                 row.NAME,
                 file(row.FILE_PATH),
                 row.FILE_TYPE,
                 row.CRAM_REFERENCE_PATH,
-                row.MAKE_DBG.toLowerCase() == 'true'
+                row.MAKE_DBG.toLowerCase() == 'true',
+                normalizationRaw
             )
         }
         .branch {
-            name, input_file, file_type, cram_ref, make_dbg ->
+            _name, _input_file, file_type, _cram_ref, make_dbg, _normalization ->
             to_build_dbg:  make_dbg == true
             existing_dbg:  make_dbg == false && file_type == 'dbg'
             other:         make_dbg == false && file_type != 'dbg'
@@ -185,26 +218,28 @@ workflow {
 
     // Build de Bruijn graphs where requested
     MAKE_DBG(
-        branched.to_build_dbg.map { name, input_file, file_type, cram_ref, make_dbg ->
+        branched.to_build_dbg.map { name, input_file, file_type, cram_ref, _make_dbg, _normalization ->
             tuple(name, input_file, file_type, cram_ref)
         }
     )
 
     // Rows that already have a pre-built DBG file go straight to GATHER_KMERS_DBG
     existing_dbg_for_gather_ch = branched.existing_dbg
-        .map { name, input_file, file_type, cram_ref, make_dbg ->
+        .map { name, input_file, _file_type, _cram_ref, _make_dbg, _normalization ->
             tuple(name, input_file)
         }
 
     // Combine freshly built DBGs and pre-existing DBG files, then gather k-mers
     GATHER_KMERS_DBG(
-        MAKE_DBG.out.mix(existing_dbg_for_gather_ch)
+        MAKE_DBG.out.mix(existing_dbg_for_gather_ch),
+        UNPACK_KMER_FASTA.out,
+        file("${projectDir}/scripts/dbg_to_kmer_table.py")
     )
 
     // All remaining file types go to the Jellyfish-based k-mer counter
     GATHER_KMERS_JF(
         branched.other
-            .map { name, input_file, file_type, cram_ref, _make_dbg ->
+            .map { name, input_file, file_type, cram_ref, _make_dbg, _normalization ->
                 tuple(name, input_file, file_type, cram_ref)
             }
             .combine(UNPACK_KMER_FASTA.out)
@@ -214,9 +249,17 @@ workflow {
     )
 
     // Collect names of all kmer output files into a single manifest
-    COLLECT_KMER_OUTPUTS(
+    FORMAT_AND_MERGE_KMERS(
         GATHER_KMERS_DBG.out.mix(GATHER_KMERS_JF.out)
-            .map { name, kmer_file -> kmer_file }
-            .collect()
+            .map { _name, kmer_file -> kmer_file }
+            .collect(),
+        file("${projectDir}/scripts/reformat_merge_kmers.py"),
+        file("${projectDir}/data/all_tagging_kmers.tsv.gz")
+    )
+
+    GENOTYPE(
+        FORMAT_AND_MERGE_KMERS.out,
+        channel.value(file(params.samplesheet, checkIfExists: true)),
+        file("${projectDir}/scripts/genotype.py")
     )
 }

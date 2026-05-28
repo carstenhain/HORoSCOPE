@@ -17,3 +17,15 @@ HG00404_DBG;/scratch/hain/centromere/tool_data/HG00404.unitigs.fa.gz;dbg
 HG00404_CRAM;/scratch/hain/centromere/tool_data/HG00404.final.cram;cram
 HG00437_DBG;/scratch/hain/centromere/tool_data/HG00437.unitigs.fa.gz;dbg
 HG00437_CRAM;/scratch/hain/centromere/tool_data/HG00437.final.cram;cram
+
+
+I need 
+samtools
+jellyfish
+python packages????
+    tqdm
+    pandas
+    pickle
+    polars
+    numpy
+pv
