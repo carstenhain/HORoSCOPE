@@ -12,18 +12,66 @@ For new samples, HORoSCOPE counts predefined k-mer sets, normalizes k-mer dosage
 The workflow supports several input formats, including FASTQ/FASTA files, BAM/CRAM alignments, and precomputed de Bruijn graph unitigs. It also provides alternative normalization strategies to account for variable copy-number states, for example in tumor genomes.
 
 
+## Usage
 
-## Overview
+Run from repository root:
 
-Main workflow:
+```bash
+nextflow run horoscope.nf \
+	-c nextflow.config \
+	--samplesheet samplesheet.csv \
+	--outdir results
+```
 
-- `horoscope.nf` (recommended)
+Optional parameters:
 
-Auxiliary/legacy workflows in this repository:
+- `--kmer_fasta` (default: `data/all_tagging_kmers.fasta.gz`)
+- `--model_directory` (default: `models/`)
+- `--help`
 
-- `genotype_centromere.nf`
-- `genotype_centromere_train_test.nf`
-- `kmer_search.nf`
+## Input
+
+The main workflow (`horoscope.nf`) expects a semicolon-separated samplesheet with this header:
+
+```text
+NAME;FILE_PATH;FILE_TYPE;CRAM_REFERENCE_PATH;MAKE_DBG;NORMALIZATION
+```
+
+Column definitions:
+
+- `NAME`: unique sample identifier
+- `FILE_PATH`: path to sample input file
+- `FILE_TYPE`: one of `dbg`, `fastq`, `fasta`, `bam`, `cram`
+- `CRAM_REFERENCE_PATH`: reference FASTA for CRAM decoding; use `NA` for non-CRAM samples
+- `MAKE_DBG`: `true` or `false`
+- `NORMALIZATION`: one of `global`, `chromosome`, `p_arm`, `q_arm`, or a numeric value
+
+Notes:
+
+- See samplesheet.csv for an example.
+- For `FILE_TYPE=cram`, `CRAM_REFERENCE_PATH` must be provided.
+- HORoSCOPE inference models were trained on de Bruijn graphs generated from short-read sequencing data. Therefore, predictions from precomputed de Bruijn graph unitigs may be more accurate than predictions from raw short-read data. For convenience, the workflow includes a MAKE_DBG parameter intended to automatically generate de Bruijn graph unitigs using BCALM. However, this step is not currently implemented. To generate de Bruijn graph input, please use the helper script `dbg_generation/make_dbg.sh` for now.
+
+
+## Output
+
+The workflow publishes the following files to `--outdir`:
+
+- `final_kmer_merged.tsv`: merged k-mer count table across all samples, including k-mer cluster annotation
+- `normalization_metrics.tsv`: per-sample normalization metrics for each normalization strategy
+- `centromere_genotyping.tsv`: final per-sample/per-chromosome inference table with:
+	- `SAMPLE`
+	- `CHROM`
+	- `CLUSTER_H1`
+	- `CLUSTER_H2`
+	- `HOR_LENGTH`
+
+## Repository Structure
+
+- `scripts/`: python scripts for k-mer extraction, table merging, and genotyping
+- `models/`: pretrained models used for length inference
+- `data/`: tagging k-mer resources
+- `dbg_generation/`: helper script for DBG generation
 
 ## Software Requirements
 
@@ -48,73 +96,13 @@ Auxiliary/legacy workflows in this repository:
 - `numpy`
 - `polars`
 - `tqdm`
-- `scikit-learn` (for loading and using trained models)
+- `scikit-learn`
 
 ### Runtime environment notes
 
-- The provided `nextflow.config` is configured for an HPC/Slurm environment and Apptainer.
-- Adapt profiles, queues, and container settings as needed for your local cluster or workstation.
-
-## Input
-
-The main workflow (`horoscope.nf`) expects a semicolon-separated samplesheet with this header:
-
-```text
-NAME;FILE_PATH;FILE_TYPE;CRAM_REFERENCE_PATH;MAKE_DBG;NORMALIZATION
-```
-
-Column definitions:
-
-- `NAME`: unique sample identifier
-- `FILE_PATH`: path to sample input file
-- `FILE_TYPE`: one of `dbg`, `fastq`, `fasta`, `bam`, `cram`
-- `CRAM_REFERENCE_PATH`: reference FASTA for CRAM decoding; use `NA` for non-CRAM samples
-- `MAKE_DBG`: `true` or `false`
-- `NORMALIZATION`: one of `global`, `chromosome`, `p_arm`, `q_arm`, or a numeric value
-
-Notes:
-
-- For `FILE_TYPE=cram`, `CRAM_REFERENCE_PATH` must be provided.
-- The current `MAKE_DBG=true` process is a placeholder in `horoscope.nf`; for production runs, use precomputed DBG unitigs (`FILE_TYPE=dbg`, `MAKE_DBG=false`) or read/alignment inputs with Jellyfish.
-
-## Usage
-
-Run from repository root:
-
-```bash
-nextflow run horoscope.nf \
-	-c nextflow.config \
-	--samplesheet samplesheet.csv \
-	--outdir results \
-	-resume
-```
-
-Optional parameters:
-
-- `--kmer_fasta` (default: `data/all_tagging_kmers.fasta.gz`)
-- `--model_directory` (default: `models/`)
-- `--help`
-
-## Output
-
-The workflow publishes the following files to `--outdir`:
-
-- `final_kmer_merged.tsv`: merged k-mer count table across all samples, including k-mer cluster annotation
-- `normalization_metrics.tsv`: per-sample normalization metrics for each normalization strategy
-- `centromere_genotyping.tsv`: final per-sample/per-chromosome inference table with:
-	- `SAMPLE`
-	- `CHROM`
-	- `CLUSTER_H1`
-	- `CLUSTER_H2`
-	- `HOR_LENGTH`
-
-## Repository Structure
-
-- `scripts/`: helper scripts for k-mer extraction, table merging, and genotyping
-- `models/`: pretrained models used for length inference
-- `data/`: tagging k-mer resources and supporting files
-- `dbg_generation/`: helper script for DBG generation
+- The provided `nextflow.config` is configured for a Slurm environment.
+- Adapt resources, queues, and settings as needed for your local cluster or workstation.
 
 ## Citation
 
-If you use this repository for a manuscript, please cite the associated publication (add DOI/reference here once available).
+If you use this repository for a manuscript, please cite the associated publication.

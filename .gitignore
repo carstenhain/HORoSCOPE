@@ -10,3 +10,4 @@ data/chr8_hor_spec_kmers.txt
 data/chr8_hor_spec_kmers.tsv
 scripts/make_kmer_reference_sets.ipynb
 scripts/merge_kmer_counts.py
+scripts/final_kmer_merge.py
