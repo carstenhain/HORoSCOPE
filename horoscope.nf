@@ -5,13 +5,14 @@ nextflow.enable.dsl=2
 params.samplesheet = "samplesheet.csv"
 params.outdir = null
 params.kmer_fasta = "${projectDir}/data/all_tagging_kmers.fasta.gz"
+params.model_directory = "${projectDir}/models/"
 params.help = false
 
 // Help message
 def helpMessage() {
     log.info"""
     Usage:
-        nextflow run gather_kmers.nf --samplesheet <path> --outdir <path>
+        nextflow run horoscope.nf --samplesheet <path> --outdir <path>
 
     Required arguments:
         --samplesheet PATH    Path to the semicolon-separated samplesheet file
@@ -26,7 +27,7 @@ def helpMessage() {
       - FILE_TYPE:            Type of the input file (string, e.g. 'bam', 'cram', 'fastq', 'dbg')
       - CRAM_REFERENCE_PATH:  Path to reference FASTA for CRAM decoding (or NA)
       - MAKE_DBG:             Whether to build a de Bruijn graph for this sample (true/false)
-      - NORMALIZATION:        Normalization mode ('global', 'chrom', or a float value)
+      - NORMALIZATION:        Normalization mode ('global', 'chromosome', 'p_arm', 'q_arm', or a float value)
     """.stripIndent()
 }
 
@@ -165,11 +166,15 @@ process GENOTYPE {
     path(genotype_script)
 
     output:
+    path("normalization_metrics.tsv")
     path("centromere_genotyping.tsv")
 
     script:
     """
-    echo "python3 ${genotype_script} --kmer_file_path ${merged_kmers} --samplesheet ${samplesheet}"
+    python ${genotype_script} \\
+        --kmer_table ${merged_kmers} \\
+        --samplesheet ${samplesheet} \\
+        --model_directory ${params.model_directory}
     """
 }
 
@@ -192,8 +197,8 @@ workflow {
             def normalizationRaw = (row.NORMALOIZATION ?: row.NORMALIZATION ?: '').toString().trim()
             def normalizationLower = normalizationRaw.toLowerCase()
             def isFloatNormalization = normalizationRaw.isNumber()
-            if (!(normalizationLower in ['global', 'chrom']) && !isFloatNormalization) {
-                error "Invalid NORMALIZATION value '${normalizationRaw}' for sample ${row.NAME}. Allowed values are 'global', 'chrom', or a float."
+            if (!(normalizationLower in ['global', 'chromosome', 'p_arm', 'q_arm']) && !isFloatNormalization) {
+                error "Invalid NORMALIZATION value '${normalizationRaw}' for sample ${row.NAME}. Allowed values are 'global', 'chromosome', 'p_arm', 'q_arm', or a float."
             }
 
             tuple(

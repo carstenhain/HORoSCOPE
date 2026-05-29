@@ -4,6 +4,16 @@ import pandas as pd # type: ignore
 import pickle
 import numpy as np # type: ignore
 from tqdm import tqdm # type: ignore
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    message="X does not have valid feature names, but PCA was fitted with feature names"
+)
+warnings.filterwarnings(
+    "ignore",
+    message=r"Trying to unpickle estimator .*",
+    module=r"sklearn\.base"
+)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -23,6 +33,13 @@ def main():
     
     ### load samplesheet
     samplesheet = pd.read_csv(args.samplesheet, sep=";")
+    
+    
+    
+    
+    
+    ####### NORMALIZATION
+    
     
     ### calculate normalization
     sample_names = samplesheet["NAME"].tolist()
@@ -102,51 +119,75 @@ def main():
     
     ### concat normed kmer dataframes of all chromosomes
     normed_kmer_df = pd.concat(normed_kmer_dfs)
-    normed_kmer_df.to_csv("debug_normed_kmers.tsv", sep="\t", index=True)
 
-    """
-    ### normalize kmer counts
-    normed_kmer_df = kmer_df / normalization
-
-    ### store normalization in results
-    normalization["CHROM"] = "ALL"
-    normalization["TYPE"] = "NORM"
-    normalization["CLUSTER"] = "NORM"
-    results.append(normalization)
-
-    ### store information how many normalization kmers were found in the sample
-    normalization_found = (kmer_df.loc[norm_kmers] > 0).sum() / len(norm_kmers)
-    normalization_found["CHROM"] = "ALL"
-    normalization_found["TYPE"] = "NORM"
-    normalization_found["CLUSTER"] = "NORM_FOUND"
-    results.append(normalization_found)
-
-    ### query all chromosomes and determine cluster, save the fraction of found kmers in a dataframe    
+    ### build dataframe with normalization metrics for QC
+    ### precompute kmers sets
+    norm_kmer_sets = {
+        "GLOBAL": normed_kmer_df[normed_kmer_df["CLUSTER"].str.contains("_NORM_")].index.tolist()
+    }
     for chrom in chromosomes:
+        norm_kmer_sets[chrom] = normed_kmer_df[normed_kmer_df["CLUSTER"].str.contains(f"{chrom}_NORM_")].index.tolist()
+        norm_kmer_sets[f"{chrom}_P"] = normed_kmer_df[normed_kmer_df["CLUSTER"].str.contains(f"{chrom}_NORM_P")].index.tolist()
+        norm_kmer_sets[f"{chrom}_Q"] = normed_kmer_df[normed_kmer_df["CLUSTER"].str.contains(f"{chrom}_NORM_Q")].index.tolist()
+        
+    
+    ### precompute number of found kmers for each strategy and sample
+    found_kmer_cutoff = 0
+    strategy_counts = {
+        strategy: (normed_kmer_df.loc[kmers, sample_names] > found_kmer_cutoff).sum(axis=0)
+        for strategy, kmers in norm_kmer_sets.items()
+    }
+
+    ### add normalization metrics to norm_df
+    col_num_norm_kmers_found = []
+    col_frac_norm_kmers_found = []
+    
+    for idx, row in tqdm(norm_df.iterrows(), desc="Calculating normalization metrics", total=norm_df.shape[0]):
+
+        ### number of found kmers are those with a count > 0
+        strategy = row["NORM_STRATEGY"]
+        num_found = strategy_counts[strategy].at[idx]
+        
+        col_num_norm_kmers_found.append(num_found)
+        col_frac_norm_kmers_found.append(num_found / len(norm_kmer_sets[strategy]))
+        
+    norm_df["NUM_KMERS_FOUND"] = col_num_norm_kmers_found
+    norm_df["FRAC_KMERS_FOUND"] = col_frac_norm_kmers_found
+    
+    ### write normalization metrics to file for QC
+    norm_df[["NORM_STRATEGY", "mean", "std", "NUM_KMERS_FOUND", "FRAC_KMERS_FOUND"]].to_csv("normalization_metrics.tsv", sep="\t", index=True)
+    
+    
+    
+    
+    
+    ####### GENOTYPING
+    
+    ### query all chromosomes and determine cluster, save the fraction of found kmers in a dataframe    
+    for chrom in tqdm(chromosomes, desc="Genotyping by chromosome", total=len(chromosomes)):
         
         ### gather all clusters for this chromosomes
         pattern = re.compile(rf"^{re.escape(chrom)}_\d{{1,5}}$")
         cluster = [
             x
-            for x in kmer_annot_df["CLUSTER"].dropna().astype(str).unique().tolist()
+            for x in normed_kmer_df["CLUSTER"].dropna().astype(str).unique().tolist()
             if pattern.fullmatch(x)
         ]
         
         ### get fraction of found kmers (kmer count > 2) for each cluster
         for c in cluster:
-            
+
             ### subset kmers to this cluster
-            c_subset = kmer_df.loc[
-                    kmer_annot_df[kmer_annot_df["CLUSTER"] == c]["KMER"].tolist()
-                ]
+            c_subset = normed_kmer_df[normed_kmer_df["CLUSTER"] == c][sample_names]
             
             ### get number of kmers and number of positive kmers
             c_kmers = c_subset.shape[0]
+
             ### skip clusters with very few tagging kmers
             if c_kmers < 10:
                 c_positive = 0
             else:   
-                c_positive = (c_subset > 2).sum()
+                c_positive = (c_subset > 0.2).sum()
             
             ### calculate fraction and add information about cluster and chromosome
             result_series = c_positive / c_kmers
@@ -158,7 +199,7 @@ def main():
             ### append results
             results.append(result_series)
         
-
+        
         ### predict length
 
         # load prediction models
@@ -186,21 +227,22 @@ def main():
         result_series["TYPE"] = "LENGTH"
 
         ### predict length for each sample
-        for sample in normed_kmer_df.columns:
-            total_length_reduced = pca_models[model_name].transform(normed_kmer_df.loc[length_kmers][sample].values.reshape(1, -1))
+        for sample in sample_names:
+            sample_kmer_vector = normed_kmer_df[normed_kmer_df["CLUSTER"] == model_name].loc[length_kmers, sample].to_numpy(dtype=float).reshape(1, -1)
+            total_length_reduced = pca_models[model_name].transform(sample_kmer_vector)
             total_length_prediction = linreg_models[model_name].predict(total_length_reduced)[0]
             result_series[sample] = total_length_prediction
 
         ### append results
         results.append(result_series)
-
+        
     results_df = pd.DataFrame(results)
 
-    results_df.to_csv("centromere_genotyping_results.tsv", sep="\t", index=False)
+    #results_df.to_csv("centromere_genotyping_results.tsv", sep="\t", index=False)
 
     formatted_results = []
 
-    for sample in normed_kmer_df.columns:
+    for sample in sample_names:
 
         for chrom in chromosomes:
 
@@ -226,13 +268,11 @@ def main():
                 "CHROM":chrom,
                 "CLUSTER_H1":h1,
                 "CLUSTER_H2":h2,
-                "HOR_LENGTH":results_df[(results_df["CHROM"] == chrom) & (results_df["CLUSTER"] == "LENGTH")][sample].values[0],
-                "NORM":results_df[(results_df["TYPE"] == "NORM") & (results_df["CLUSTER"] == "NORM")][sample].values[0],
-                "NORM_FOUND":results_df[(results_df["TYPE"] == "NORM") & (results_df["CLUSTER"] == "NORM_FOUND")][sample].values[0],
+                "HOR_LENGTH":results_df[(results_df["CHROM"] == chrom) & (results_df["CLUSTER"] == "LENGTH")][sample].values[0]
             })
 
     ### write to file
     pd.DataFrame(formatted_results).to_csv("centromere_genotyping.tsv", sep="\t", index=False)
-    """
+    
 if __name__ == '__main__':
     main()

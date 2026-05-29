@@ -3,3 +3,8 @@ genotype_centromere.nf
 data/check_data.ipynb
 notes.txt
 unused_nextflow.war_mal_config
+kmer_search.nf
+samplesheet_1kGP.csv
+data/chr8_hor_spec_kmers.fa
+data/chr8_hor_spec_kmers.txt
+data/chr8_hor_spec_kmers.tsv
