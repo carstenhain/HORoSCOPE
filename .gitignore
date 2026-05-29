@@ -1,10 +1,12 @@
 genotype_centromere_train_test.nf
 genotype_centromere.nf
-data/check_data.ipynb
 notes.txt
 unused_nextflow.war_mal_config
 kmer_search.nf
 samplesheet_1kGP.csv
+data/check_data.ipynb
 data/chr8_hor_spec_kmers.fa
 data/chr8_hor_spec_kmers.txt
 data/chr8_hor_spec_kmers.tsv
+scripts/make_kmer_reference_sets.ipynb
+scripts/merge_kmer_counts.py
