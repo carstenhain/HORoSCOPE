@@ -1,11 +1,11 @@
 # HORoSCOPE
 
-HORoSCOPE is a Nextflow workflow for inferring centromere structure from short-read sequencing data. It estimates two key features of centromeres in a chromosome-specific manner:
+HORoSCOPE (**H**igher-**O**rder **R**epeat **o**rganization and **S**ize of **C**entromeres using **O**ligonucleotide **P**rofiles for **E**stimation) is a Nextflow workflow for inferring centromere structure from short-read sequencing data. It estimates two key features of centromeres in a chromosome-specific manner:
 
-- centromeric HOR architecture
+- centromeric Higher-Order Repeat (HOR) architecture
 - mean alpha-satellite/HOR array length
 
-HORoSCOPE (**H**igher-**O**rder **R**epeat **o**rganization and **S**ize of **C**entromeres using **O**ligonucleotide **P**rofiles for **E**stimation) is based on a reference atlas of complete human centromere assemblies. In the associated study, distinct centromere architectures were defined from a mean of 493 complete centromere haplotypes per chromosome, and architecture-specific *k*-mers were selected from these assemblies. In parallel, *k*-mers whose dosage correlates with alpha-satellite/HOR array length were identified for each chromosome.
+HORoSCOPE is based on a reference atlas of complete human centromere assemblies. In the associated study, distinct centromere architectures were defined from a mean of 493 complete centromere haplotypes per chromosome, and architecture-specific *k*-mers were selected from these assemblies. In parallel, *k*-mers whose dosage correlates with alpha-satellite/HOR array length were identified for each chromosome.
 
 For new samples, HORoSCOPE counts predefined *k*-mer sets, normalizes *k*-mer dosage to account for differences in sequencing depth, and applies pretrained chromosome-specific models to infer centromere architecture and HOR array length.
 
