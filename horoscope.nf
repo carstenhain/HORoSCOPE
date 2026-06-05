@@ -35,18 +35,44 @@ def helpMessage() {
 // Processes
 // ---------------------------------------------------------------------------
 
-process MAKE_DBG {
-    tag "${name}"
+process DBG_LIGHTER {
+    tag "LIGHTER_${name}"
 
     input:
-    tuple val(name), path(input_file), val(file_type), val(cram_ref)
+    tuple val(name), path(input_file), val(file_type)
+
+    output:
+    tuple val(name), path("${name}.cor.fastq.gz")
+
+    script:
+    """
+    if [[ "${file_type}" != "fastq.gz" && "${file_type}" != "fastq" ]]; then
+        echo "Read correction with lighter only supports FILE_TYPE='fastq.gz' or 'fastq' for sample ${name}; got '${file_type}'" >&2
+        exit 1
+    fi
+
+    if [[ "${input_file}" != *.fastq.gz && "${input_file}" != *.fq.gz ]]; then
+        echo "Read correction with lighter requires a .fastq.gz or .fq.gz input file for sample ${name}; got '${input_file}'" >&2
+        exit 1
+    fi
+
+    lighter -t ${task.cpus} -r "${input_file}" -trim -discard -k 23 3100000000 0.188
+    """
+}
+
+process DBG_BCALM {
+    tag "BCALM_${name}"
+
+    input:
+    tuple val(name), path(corrected_fastq)
 
     output:
     tuple val(name), path("${name}.unitigs.fa.gz")
 
     script:
     """
-    touch ${name}.unitigs.fa.gz
+    echo "dbg_bcalm placeholder: not implemented yet for sample ${name}" >&2
+    exit 1
     """
 }
 
@@ -222,10 +248,14 @@ workflow {
     UNPACK_KMER_FASTA(channel.value(file(params.kmer_fasta, checkIfExists: true)))
 
     // Build de Bruijn graphs where requested
-    MAKE_DBG(
-        branched.to_build_dbg.map { name, input_file, file_type, cram_ref, _make_dbg, _normalization ->
-            tuple(name, input_file, file_type, cram_ref)
+    DBG_LIGHTER(
+        branched.to_build_dbg.map { row ->
+            tuple(row[0], row[1], row[2])
         }
+    )
+
+    DBG_BCALM(
+        DBG_LIGHTER.out
     )
 
     // Rows that already have a pre-built DBG file go straight to GATHER_KMERS_DBG
@@ -236,7 +266,7 @@ workflow {
 
     // Combine freshly built DBGs and pre-existing DBG files, then gather k-mers
     GATHER_KMERS_DBG(
-        MAKE_DBG.out.mix(existing_dbg_for_gather_ch),
+        DBG_BCALM.out.mix(existing_dbg_for_gather_ch),
         UNPACK_KMER_FASTA.out,
         file("${projectDir}/scripts/dbg_to_kmer_table.py")
     )

@@ -52,6 +52,15 @@ Notes:
 - For `FILE_TYPE=cram`, `CRAM_REFERENCE_PATH` must be provided.
 - HORoSCOPE inference models were trained on de Bruijn graphs generated from short-read sequencing data. Therefore, predictions from precomputed de Bruijn graph unitigs may be more accurate than predictions from raw short-read data. For convenience, the workflow includes a MAKE_DBG parameter intended to automatically generate de Bruijn graph unitigs using BCALM. However, this step is not currently implemented. To generate de Bruijn graph input, please use the helper script `dbg_generation/make_dbg.sh` for now.
 
+Normalization:
+
+- *k*-mer dosage is normalized to account for differences in sequencing depth (and copy-number state). The normalization mode is provided in the samplesheet through the NORMALIZATION column.
+- `global`: Uses all normalization *k*-mers across all chromosomes. Recommended for samples without copy-number alterations.
+- `chromosome`: Uses normalization *k*-mers from the same chromosome as the architecture- and length-informative *k*-mers. Recommended for samples with whole-chromosome gains or losses.
+- `p_arm` or `q_arm`: Uses normalization *k*-mers from the corresponding chromosome arm. Might be useful for cancer samples with recurrent arm-level copy-number changes.
+Number: Uses a user-defined numeric value for normalization instead of *k*-mer-derived normalization. This can be useful for cancers with widespread copy-number alterations. 
+In the associated manuscript, all normalization *k*-mers from copy-number-neutral chromosome arms were merged, and their mean value was used as this parameter.
+
 
 ## Output
 
@@ -83,12 +92,14 @@ The workflow publishes the following files to `--outdir`:
 
 ### Command-line tools used by the workflow
 
-- `jellyfish` (*k*-mer counting for read/alignment inputs)
+- [`jellyfish`](https://github.com/gmarcais/jellyfish) (*k*-mer counting for read/alignment inputs)
 - `samtools` (BAM/CRAM to FASTA conversion)
 - `gzip`/`zcat`
 - `awk`
 - `grep`
 - `pv`
+- [`bcalm`](https://github.com/gatb/bcalm)
+- [`lighter`](https://github.com/mourisl/Lighter)
 
 ### Python packages used by scripts
 
@@ -105,4 +116,4 @@ The workflow publishes the following files to `--outdir`:
 
 ## Citation
 
-If you use this repository for a manuscript, please cite the associated publication.
+If you use this repository, please cite the associated [publication].
