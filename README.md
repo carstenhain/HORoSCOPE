@@ -58,8 +58,7 @@ Normalization:
 - `global`: Uses all normalization *k*-mers across all chromosomes. Recommended for samples without copy-number alterations.
 - `chromosome`: Uses normalization *k*-mers from the same chromosome as the architecture- and length-informative *k*-mers. Recommended for samples with whole-chromosome gains or losses.
 - `p_arm` or `q_arm`: Uses normalization *k*-mers from the corresponding chromosome arm. Might be useful for cancer samples with recurrent arm-level copy-number changes.
-Number: Uses a user-defined numeric value for normalization instead of *k*-mer-derived normalization. This can be useful for cancers with widespread copy-number alterations. 
-In the associated manuscript, all normalization *k*-mers from copy-number-neutral chromosome arms were merged, and their mean value was used as this parameter.
+- Number: Uses a user-defined numeric value for normalization instead of *k*-mer-derived normalization. This can be useful for cancers with widespread copy-number alterations. In the associated manuscript, all normalization *k*-mers from copy-number-neutral chromosome arms were merged, and their mean value was used as this parameter.
 
 
 ## Output
