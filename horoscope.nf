@@ -42,7 +42,7 @@ process DBG_LIGHTER {
     tuple val(name), path(input_file), val(file_type)
 
     output:
-    tuple val(name), path("${name}.cor.fastq.gz")
+    tuple val(name), path("${name}.cor.fq.gz")
 
     script:
     """
@@ -56,7 +56,15 @@ process DBG_LIGHTER {
         exit 1
     fi
 
-    lighter -t ${task.cpus} -r "${input_file}" -trim -discard -k 23 3100000000 0.188
+    # store lighter output in this directory
+    mkdir -p lighter_output
+
+    # run lighter
+    lighter -t ${task.cpus} -r "${input_file}" -od lighter_output -trim -discard -k 23 3100000000 0.188
+
+    # move and rename lighter output
+    mv lighter_output/*.gz "${name}.cor.fq.gz"
+
     """
 }
 
@@ -71,8 +79,11 @@ process DBG_BCALM {
 
     script:
     """
-    echo "dbg_bcalm placeholder: not implemented yet for sample ${name}" >&2
-    exit 1
+    bcalm -in "${corrected_fastq}" -kmer-size 61 -abundance-min 3 -out "${name}"
+
+    gzip -c "${name}.unitigs.fa" > "${name}.unitigs.fa.gz"
+
+    rm -f "${name}.list_reads"
     """
 }
 
