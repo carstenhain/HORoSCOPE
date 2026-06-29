@@ -5,6 +5,7 @@ nextflow.enable.dsl=2
 params.samplesheet = "samplesheet.csv"
 params.outdir = null
 params.kmer_fasta = "${projectDir}/data/all_tagging_kmers.fasta.gz"
+params.kmer_info_file = "${projectDir}/data/all_tagging_kmers.tsv.gz"
 params.model_directory = "${projectDir}/models/"
 params.help = false
 
@@ -79,7 +80,12 @@ process DBG_BCALM {
 
     script:
     """
-    bcalm -in "${corrected_fastq}" -kmer-size 61 -abundance-min 3 -out "${name}"
+    bcalm \
+        -in "${corrected_fastq}" \
+        -kmer-size 61 \
+        -abundance-min 3 \
+        -max-memory ${task.memory.toMega()} \
+        -out "${name}"
 
     gzip -c "${name}.unitigs.fa" > "${name}.unitigs.fa.gz"
 
@@ -300,7 +306,7 @@ workflow {
             .map { _name, kmer_file -> kmer_file }
             .collect(),
         file("${projectDir}/scripts/reformat_merge_kmers.py"),
-        file("${projectDir}/data/all_tagging_kmers.tsv.gz")
+        file(params.kmer_info_file, checkIfExists: true)
     )
 
     GENOTYPE(

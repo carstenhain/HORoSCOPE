@@ -163,6 +163,11 @@ def main():
     
     ####### GENOTYPING
     
+    # load prediction models
+    kmer_sets = pickle.load(open(f"{args.model_directory}/length_kmers.pkl", "rb"))
+    pca_models = pickle.load(open(f"{args.model_directory}/pca_models.pkl", "rb"))
+    linreg_models = pickle.load(open(f"{args.model_directory}/linreg_models.pkl", "rb"))
+    
     ### query all chromosomes and determine cluster, save the fraction of found kmers in a dataframe    
     for chrom in tqdm(chromosomes, desc="Genotyping by chromosome", total=len(chromosomes)):
         
@@ -170,7 +175,7 @@ def main():
         pattern = re.compile(rf"^{re.escape(chrom)}_\d{{1,5}}$")
         cluster = [
             x
-            for x in normed_kmer_df["CLUSTER"].dropna().astype(str).unique().tolist()
+            for x in normed_kmer_df["CLUSTER"].dropna().astype(str).unique().tolist() # type: ignore
             if pattern.fullmatch(x)
         ]
         
@@ -202,12 +207,14 @@ def main():
         
         ### predict length
 
+        """
         # load prediction models
         kmer_sets = pickle.load(open(f"{args.model_directory}/{chrom}_len_kmers.pkl", "rb"))
         pca_models = pickle.load(open(f"{args.model_directory}/{chrom}_pca.pkl", "rb"))
         linreg_models = pickle.load(open(f"{args.model_directory}/{chrom}_linreg.pkl", "rb"))
+        """
 
-        model_name = f"{chrom}_LENGTH_HOR"
+        model_name = f"{chrom}_HOR"
 
         # skip if no model is present or not enough kmers are used for the model
         if not (model_name in kmer_sets):
@@ -218,7 +225,7 @@ def main():
             continue
         
         ### extract length kmers
-        length_kmers = kmer_sets[model_name].tolist()
+        length_kmers = kmer_sets[model_name]
 
         ### prepare results
         result_series = pd.Series()

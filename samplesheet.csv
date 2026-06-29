@@ -1,4 +1,15 @@
 NAME;FILE_PATH;FILE_TYPE;CRAM_REFERENCE_PATH;MAKE_DBG;NORMALIZATION
-HG00096_FASTQ;/scratch/hain/centromere/tool_data/HG00096.fastq.gz;fastq;NA;true;global
+HG01183_DBG;/scratch/hain/centromere/tool_data/HG01183.unitigs.fa.gz;dbg;NA;false;global
+HG01251_DBG;/scratch/hain/centromere/tool_data/HG01251.unitigs.fa.gz;dbg;NA;false;global
+HG01345_DBG;/scratch/hain/centromere/tool_data/HG01345.unitigs.fa.gz;dbg;NA;false;global
+HG00105_DBG;/scratch/hain/centromere/tool_data/HG00105.unitigs.fa.gz;dbg;NA;false;global
 HG00096_DBG;/scratch/hain/centromere/tool_data/HG00096.unitigs.fa.gz;dbg;NA;false;global
-HG00096_CRAM;/scratch/hain/centromere/tool_data/HG00096.final.cram;cram;/scratch/hain/centromere/tool_data/GRCh38_full_analysis_set_plus_decoy_hla.fa;false;global
+HG00271_DBG;/scratch/hain/centromere/tool_data/HG00271.unitigs.fa.gz;dbg;NA;false;global
+HG00244_DBG;/scratch/hain/centromere/tool_data/HG00244.unitigs.fa.gz;dbg;NA;false;global
+HG00404_DBG;/scratch/hain/centromere/tool_data/HG00404.unitigs.fa.gz;dbg;NA;false;global
+HG00437_DBG;/scratch/hain/centromere/tool_data/HG00437.unitigs.fa.gz;dbg;NA;false;global
+HG01352_DBG;/scratch/hain/centromere/tool_data/HG01352.unitigs.fa.gz;dbg;NA;false;global
+HG01358_DBG;/scratch/hain/centromere/tool_data/HG01358.unitigs.fa.gz;dbg;NA;false;global
+HG00329_DBG;/scratch/hain/centromere/tool_data/HG00329.unitigs.fa.gz;dbg;NA;false;global
+HG02735_DBG;/scratch/hain/centromere/tool_data/HG02735.unitigs.fa.gz;dbg;NA;false;global
+NA19983_DBG;/scratch/hain/centromere/tool_data/NA19983.unitigs.fa.gz;dbg;NA;false;global
