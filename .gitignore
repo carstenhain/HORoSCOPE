@@ -1,6 +1,7 @@
 genotype_centromere_train_test.nf
 genotype_centromere.nf
 notes.txt
+.gitignore
 unused_nextflow.war_mal_config
 kmer_search.nf
 samplesheet_1kGP.csv
