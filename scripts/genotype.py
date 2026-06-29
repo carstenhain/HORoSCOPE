@@ -207,13 +207,6 @@ def main():
         
         ### predict length
 
-        """
-        # load prediction models
-        kmer_sets = pickle.load(open(f"{args.model_directory}/{chrom}_len_kmers.pkl", "rb"))
-        pca_models = pickle.load(open(f"{args.model_directory}/{chrom}_pca.pkl", "rb"))
-        linreg_models = pickle.load(open(f"{args.model_directory}/{chrom}_linreg.pkl", "rb"))
-        """
-
         model_name = f"{chrom}_HOR"
 
         # skip if no model is present or not enough kmers are used for the model
