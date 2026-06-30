@@ -211,6 +211,8 @@ process GENOTYPE {
     output:
     path("normalization_metrics.tsv")
     path("centromere_genotyping.tsv")
+    path("centromere_genotyping.full.tsv")
+    path("centromere_genotyping_results.tsv")
 
     script:
     """

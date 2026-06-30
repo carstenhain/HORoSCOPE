@@ -37,9 +37,9 @@ def main():
     
     
     
-    
-    ####### NORMALIZATION
-    
+    #############################
+    ####### NORMALIZATION #######
+    #############################
     
     ### calculate normalization
     sample_names = samplesheet["NAME"].tolist()
@@ -137,6 +137,9 @@ def main():
         strategy: (normed_kmer_df.loc[kmers, sample_names] > found_kmer_cutoff).sum(axis=0)
         for strategy, kmers in norm_kmer_sets.items()
     }
+    
+    ### write normed kmers to file for inspection
+    #normed_kmer_df.to_csv("normed_kmers.tsv", sep="\t", index=True)
 
     ### add normalization metrics to norm_df
     col_num_norm_kmers_found = []
@@ -160,14 +163,10 @@ def main():
     
     
     
-    
-    ####### GENOTYPING
-    
-    # load prediction models
-    kmer_sets = pickle.load(open(f"{args.model_directory}/length_kmers.pkl", "rb"))
-    pca_models = pickle.load(open(f"{args.model_directory}/pca_models.pkl", "rb"))
-    linreg_models = pickle.load(open(f"{args.model_directory}/linreg_models.pkl", "rb"))
-    
+    ##########################
+    ####### GENOTYPING #######
+    ##########################
+   
     ### query all chromosomes and determine cluster, save the fraction of found kmers in a dataframe    
     for chrom in tqdm(chromosomes, desc="Genotyping by chromosome", total=len(chromosomes)):
         
@@ -203,43 +202,43 @@ def main():
 
             ### append results
             results.append(result_series)
-        
-        
-        ### predict length
 
-        model_name = f"{chrom}_HOR"
-
-        # skip if no model is present or not enough kmers are used for the model
-        if not (model_name in kmer_sets):
-            print(f"No model found for {chrom}, skipping length prediction.")
-            continue
-        if len(kmer_sets[model_name]) <= 100:
-            print(f"Not enough kmers for {chrom} length prediction, skipping.")
-            continue
+    
+    ### predict length
+    
+    # load prediction models
+    kmer_sets = pickle.load(open(f"{args.model_directory}/length_kmers.pkl", "rb"))
+    pca_models = pickle.load(open(f"{args.model_directory}/pca_models.pkl", "rb"))
+    linreg_models = pickle.load(open(f"{args.model_directory}/linreg_models.pkl", "rb"))
+    
+    length_models = kmer_sets.keys()
+        
+    for model_name in tqdm(length_models, total=len(length_models), desc="Predicting HOR length"):
         
         ### extract length kmers
         length_kmers = kmer_sets[model_name]
 
         ### prepare results
         result_series = pd.Series()
-        result_series["CLUSTER"] = "LENGTH"
-        result_series["CHROM"] = chrom
+        result_series["CLUSTER"] = model_name
+        result_series["CHROM"] = model_name.split("_")[0]
         result_series["TYPE"] = "LENGTH"
 
         ### predict length for each sample
         for sample in sample_names:
-            sample_kmer_vector = normed_kmer_df[normed_kmer_df["CLUSTER"] == model_name].loc[length_kmers, sample].to_numpy(dtype=float).reshape(1, -1)
+            sample_kmer_vector = normed_kmer_df.loc[length_kmers, sample].to_numpy(dtype=float).reshape(1, -1)
             total_length_reduced = pca_models[model_name].transform(sample_kmer_vector)
             total_length_prediction = linreg_models[model_name].predict(total_length_reduced)[0]
             result_series[sample] = total_length_prediction
-
+        
         ### append results
         results.append(result_series)
-        
+     
     results_df = pd.DataFrame(results)
+    ### output individual predictions 
+    results_df.to_csv("centromere_genotyping_results.tsv", sep="\t", index=False)
 
-    #results_df.to_csv("centromere_genotyping_results.tsv", sep="\t", index=False)
-
+    
     formatted_results = []
 
     for sample in sample_names:
@@ -262,17 +261,27 @@ def main():
             if len(cluster_passing) == 2:
                 h1 = sorted(cluster_passing)[0]
                 h2 = sorted(cluster_passing)[1]
-
-            formatted_results.append({
+            
+            sample_formatted_results = {
                 "SAMPLE":sample,
                 "CHROM":chrom,
                 "CLUSTER_H1":h1,
                 "CLUSTER_H2":h2,
-                "HOR_LENGTH":results_df[(results_df["CHROM"] == chrom) & (results_df["CLUSTER"] == "LENGTH")][sample].values[0]
-            })
+                "HOR_LENGTH":results_df[(results_df["CHROM"] == chrom) & (results_df["CLUSTER"] == f"{chrom}_HOR")][sample].values[0]
+            }
+            
+            for length_model in length_models:
+                tmp_subset = results_df[(results_df["CHROM"] == chrom) & (results_df["CLUSTER"] == length_model)]
+                if tmp_subset.empty:
+                    sample_formatted_results[length_model] = "NA"
+                else:
+                    sample_formatted_results[length_model] = tmp_subset[sample].values[0]
+            
+            formatted_results.append(sample_formatted_results)
 
     ### write to file
-    pd.DataFrame(formatted_results).to_csv("centromere_genotyping.tsv", sep="\t", index=False)
+    pd.DataFrame(formatted_results).to_csv("centromere_genotyping.full.tsv", sep="\t", index=False)
+    pd.DataFrame(formatted_results)[["SAMPLE", "CHROM", "CLUSTER_H1", "CLUSTER_H2", "HOR_LENGTH"]].to_csv("centromere_genotyping.tsv", sep="\t", index=False)
     
 if __name__ == '__main__':
     main()
