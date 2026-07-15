@@ -1,13 +1,13 @@
-# HORoSCOPE
+# HOROSCOPE
 
-HORoSCOPE (**H**igher-**O**rder **R**epeat **o**rganization and **S**ize of **C**entromeres using **O**ligonucleotide **P**rofiles for **E**stimation) is a Nextflow workflow for inferring centromere structure from short-read sequencing data. It estimates two key features of centromeres in a chromosome-specific manner:
+HOROSCOPE (**H**igher-**O**rder **R**epeat **O**rganization and **S**ize of **C**entromeres using **O**ligonucleotide **P**rofiles for **E**stimation) is a Nextflow workflow for inferring centromere structure from short-read sequencing data. It estimates two key features of centromeres in a chromosome-specific manner:
 
 - centromeric Higher-Order Repeat (HOR) architecture
 - mean alpha-satellite/HOR array length
 
-HORoSCOPE is based on a reference atlas of complete human centromere assemblies. In the associated study, distinct centromere architectures were defined from a mean of 493 complete centromere haplotypes per chromosome, and architecture-specific *k*-mers were selected from these assemblies. In parallel, *k*-mers whose dosage correlates with alpha-satellite/HOR array length were identified for each chromosome.
+HOROSCOPE is based on a reference atlas of complete human centromere assemblies. In the associated study, distinct centromere architectures were defined from a mean of 493 complete centromere haplotypes per chromosome, and architecture-specific *k*-mers were selected from these assemblies. In parallel, *k*-mers whose dosage correlates with alpha-satellite/HOR array length were identified for each chromosome.
 
-For new samples, HORoSCOPE counts predefined *k*-mer sets, normalizes *k*-mer dosage to account for differences in sequencing depth, and applies pretrained chromosome-specific models to infer centromere architecture and HOR array length.
+For new samples, HOROSCOPE counts predefined *k*-mer sets, normalizes *k*-mer dosage to account for differences in sequencing depth, and applies pretrained chromosome-specific models to infer centromere architecture and HOR array length.
 
 The workflow supports several input formats, including FASTQ/FASTA files, BAM/CRAM alignments, and precomputed de Bruijn graph unitigs. It also provides alternative normalization strategies to account for variable copy-number states, for example in tumor genomes.
 
@@ -50,7 +50,7 @@ Notes:
 
 - See samplesheet.csv for an example.
 - For `FILE_TYPE=cram`, `CRAM_REFERENCE_PATH` must be provided.
-- HORoSCOPE inference models were trained on de Bruijn graphs generated from short-read sequencing data. Therefore, predictions from precomputed de Bruijn graph unitigs may be more accurate than predictions from raw short-read data. For convenience, the workflow includes a MAKE_DBG parameter intended to automatically generate de Bruijn graph unitigs using BCALM. However, this step is not currently implemented. To generate de Bruijn graph input, please use the helper script `dbg_generation/make_dbg.sh` for now.
+- HOROSCOPE inference models were trained on de Bruijn graphs generated from short-read sequencing data. Therefore, predictions from precomputed de Bruijn graph unitigs may be more accurate than predictions from raw short-read data. For convenience, the workflow includes a MAKE_DBG parameter intended to automatically generate de Bruijn graph unitigs using BCALM. This step is implemented and works with raw or aligned reads.
 
 Normalization:
 
