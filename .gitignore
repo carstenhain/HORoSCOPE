@@ -13,3 +13,4 @@ scripts/make_kmer_reference_sets.ipynb
 scripts/merge_kmer_counts.py
 scripts/final_kmer_merge.py
 scripts/test.ipynb
+nextflow_lsf.config

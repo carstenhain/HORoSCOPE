@@ -40,20 +40,27 @@ process DBG_LIGHTER {
     tag "LIGHTER_${name}"
 
     input:
-    tuple val(name), path(input_file), val(file_type)
+    tuple val(name), path(input_file), val(file_type), val(cram_ref)
 
     output:
     tuple val(name), path("${name}.cor.fq.gz")
 
     script:
     """
-    if [[ "${file_type}" != "fastq.gz" && "${file_type}" != "fastq" ]]; then
-        echo "Read correction with lighter only supports FILE_TYPE='fastq.gz' or 'fastq' for sample ${name}; got '${file_type}'" >&2
-        exit 1
-    fi
+    lighter_input="${input_file}"
 
-    if [[ "${input_file}" != *.fastq.gz && "${input_file}" != *.fq.gz ]]; then
-        echo "Read correction with lighter requires a .fastq.gz or .fq.gz input file for sample ${name}; got '${input_file}'" >&2
+    if [[ "${file_type}" == "bam" ]]; then    
+        samtools fastq -@ ${task.cpus} "${input_file}" > "${name}.for_lighter.fastq"
+        lighter_input="${name}.for_lighter.fastq"
+    elif [[ "${file_type}" == "cram" ]]; then
+        if [[ "${cram_ref}" == "NA" || -z "${cram_ref}" ]]; then
+            echo "CRAM input requires CRAM_REFERENCE_PATH for sample ${name}" >&2
+            exit 1
+        fi
+        samtools fastq -@ ${task.cpus} --reference "${cram_ref}" "${input_file}" > "${name}.for_lighter.fastq"
+        lighter_input="${name}.for_lighter.fastq"
+    elif [[ "${file_type}" != "fastq.gz" && "${file_type}" != "fastq" && "${file_type}" != "fasta" ]]; then
+        echo "Unsupported FILE_TYPE for DBG_LIGHTER: ${file_type}. Allowed: fastq.gz, fastq, fasta, bam, cram" >&2
         exit 1
     fi
 
@@ -61,10 +68,44 @@ process DBG_LIGHTER {
     mkdir -p lighter_output
 
     # run lighter
-    lighter -t ${task.cpus} -r "${input_file}" -od lighter_output -trim -discard -k 23 3100000000 0.188
+    lighter -t ${task.cpus} -r \${lighter_input} -od lighter_output -trim -discard -k 23 3100000000 0.188
 
-    # move and rename lighter output
-    mv lighter_output/*.gz "${name}.cor.fq.gz"
+    # Capture the expected corrected filename from lighter input naming convention.
+    source_name=\$(basename "\${lighter_input}")
+    corrected_file=""
+    case "\${source_name}" in
+        *.fastq.gz)
+            corrected_file="lighter_output/\${source_name%.fastq.gz}.cor.fq.gz"
+            ;;
+        *.fq.gz)
+            corrected_file="lighter_output/\${source_name%.fq.gz}.cor.fq.gz"
+            ;;
+        *.fastq)
+            corrected_file="lighter_output/\${source_name%.fastq}.cor.fq"
+            ;;
+        *.fq)
+            corrected_file="lighter_output/\${source_name%.fq}.cor.fq"
+            ;;
+    esac
+
+    if [[ -z "\${corrected_file}" ]]; then
+        echo "Lighter did not produce a corrected read file for sample ${name}" >&2
+        exit 1
+    fi
+    if [[ ! -f "\${corrected_file}" ]]; then
+        echo "Corrected read file path was set but file does not exist: \${corrected_file}" >&2
+        exit 1
+    fi
+    if [[ "\${corrected_file}" == *.gz ]]; then
+        cp "\${corrected_file}" "${name}.cor.fq.gz"
+    else
+        gzip -c "\${corrected_file}" > "${name}.cor.fq.gz"
+        rm -f "\${corrected_file}"
+    fi
+
+    if [[ -f "${name}.for_lighter.fastq" ]]; then
+        rm -f "${name}.for_lighter.fastq"
+    fi
 
     """
 }
@@ -269,7 +310,7 @@ workflow {
     // Build de Bruijn graphs where requested
     DBG_LIGHTER(
         branched.to_build_dbg.map { row ->
-            tuple(row[0], row[1], row[2])
+            tuple(row[0], row[1], row[2], row[3])
         }
     )
 
