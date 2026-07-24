@@ -14,3 +14,5 @@ scripts/merge_kmer_counts.py
 scripts/final_kmer_merge.py
 scripts/test.ipynb
 nextflow_lsf.config
+.nextflow
+environment.yml
