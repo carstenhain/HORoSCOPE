@@ -1,0 +1,16 @@
+name: horoscope
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - pandas
+  - numpy
+  - polars
+  - tqdm
+  - scikit-learn
+  - kmer-jellyfish
+  - bcalm
+  - lighter
+  - samtools
+  - pv

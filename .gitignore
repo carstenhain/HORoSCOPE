@@ -9,10 +9,11 @@ data/check_data.ipynb
 data/chr8_hor_spec_kmers.fa
 data/chr8_hor_spec_kmers.txt
 data/chr8_hor_spec_kmers.tsv
+data/chr8_tagging_kmers.fasta.gz
+data/chr8_tagging_kmers.tsv.gz
 scripts/make_kmer_reference_sets.ipynb
 scripts/merge_kmer_counts.py
 scripts/final_kmer_merge.py
 scripts/test.ipynb
 nextflow_lsf.config
 .nextflow
-environment.yml

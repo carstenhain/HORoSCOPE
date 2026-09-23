@@ -1,9 +1,11 @@
 # HOROSCOPE
 
-HOROSCOPE (**H**igher-**O**rder **R**epeat **O**rganization and **S**ize of **C**entromeres using **O**ligonucleotide **P**rofiles for **E**stimation) is a Nextflow workflow for inferring centromere structure from short-read sequencing data. It estimates two key features of centromeres in a chromosome-specific manner:
+HOROSCOPE (**H**igher-**O**rder **R**epeat **O**rganization and **S**ize of **C**entromeres using **O**ligonucleotide **P**rofiles for **E**stimation) is a Nextflow workflow for inferring centromere structure from short-read sequencing data. 
 
-- centromeric Higher-Order Repeat (HOR) architecture
-- mean alpha-satellite/HOR array length
+- 🧬 Infers chromosome-specific centromeric HOR architectures from short-read data.
+- 📏 Estimates alpha-satellite/HOR array length from *k*-mer dosage.
+- 🗂️ Accepts FASTQ/FASTA, BAM/CRAM, and precomputed de Bruijn graph unitigs.
+- 📊 Scales to large short-read cohorts.
 
 HOROSCOPE is based on a reference atlas of complete human centromere assemblies. In the associated study, distinct centromere architectures were defined from a mean of 493 complete centromere haplotypes per chromosome, and architecture-specific *k*-mers were selected from these assemblies. In parallel, *k*-mers whose dosage correlates with alpha-satellite/HOR array length were identified for each chromosome.
 
@@ -26,8 +28,18 @@ nextflow run horoscope.nf \
 Optional parameters:
 
 - `--kmer_fasta` (default: `data/all_tagging_kmers.fasta.gz`)
+- `--kmer_info_file` (default: `data/all_tagging_kmers.tsv.gz`)
 - `--model_directory` (default: `models/`)
 - `--help`
+
+## Installation
+
+Create the supplied Conda environment, then ensure a compatible Nextflow and Java installation are available:
+
+```bash
+conda env create -f environment.yml
+conda activate horoscope
+```
 
 ## Input
 
@@ -50,7 +62,10 @@ Notes:
 
 - See samplesheet.csv for an example.
 - For `FILE_TYPE=cram`, `CRAM_REFERENCE_PATH` must be provided.
+- Set `MAKE_DBG=true` to error-correct the input and construct 61-mer BCALM unitigs before inference. Set it to `false` for a precomputed `dbg` input or to count *k*-mers directly from a FASTQ/FASTA, BAM, or CRAM input.
 - HOROSCOPE inference models were trained on de Bruijn graphs generated from short-read sequencing data. Therefore, predictions from precomputed de Bruijn graph unitigs may be more accurate than predictions from raw short-read data. For convenience, the workflow includes a MAKE_DBG parameter intended to automatically generate de Bruijn graph unitigs using BCALM. This step is implemented and works with raw or aligned reads.
+
+The bundled models report results for `chr1`-`chr12` and `chr16`-`chr20`. They do not currently genotype chromosomes `chr13`-`chr15`, `chr21`, `chr22`, `X`, or `Y`.
 
 Normalization:
 
@@ -66,13 +81,17 @@ Normalization:
 The workflow publishes the following files to `--outdir`:
 
 - `final_kmer_merged.tsv`: merged *k* count table across all samples, including *k*-mer cluster annotation
-- `normalization_metrics.tsv`: per-sample normalization metrics for each normalization strategy
+- `normalization_metrics.tsv`: per-sample normalization metrics for every available strategy, including the normalization mean and standard deviation plus the number and fraction of detected normalization *k*-mers
 - `centromere_genotyping.tsv`: final per-sample/per-chromosome inference table with:
 	- `SAMPLE`
 	- `CHROM`
 	- `CLUSTER_H1`
 	- `CLUSTER_H2`
 	- `HOR_LENGTH`
+- `centromere_genotyping.full.tsv`: final inference table with additional predictions from every available length model
+- `centromere_genotyping_results.tsv`: unformatted architecture *k*-mer detection fractions and length-model predictions for quality control
+
+`CLUSTER_H1` and `CLUSTER_H2` are the one or two detected reference architecture-cluster IDs for a chromosome; they are not phased haplotype assignments. A value of `NA` indicates that the sample did not meet the workflow's one- or two-cluster detection rule. `HOR_LENGTH` is the predicted mean alpha-satellite/HOR array length.
 
 ## Repository Structure
 
@@ -115,4 +134,6 @@ The workflow publishes the following files to `--outdir`:
 
 ## Citation
 
-If you use this repository, please cite the associated [publication].
+If you use this repository, please cite:
+
+Hain C, Rausch T, Human Genome Structural Variation Consortium, Human Pangenome Reference Consortium, and Korbel JO. *HOROSCOPE: Decoding human centromere architecture from short reads using k-mer signatures.* bioRxiv (2026). [https://doi.org/10.64898/2026.06.10.731283](https://doi.org/10.64898/2026.06.10.731283)
